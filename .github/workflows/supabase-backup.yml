@@ -1,0 +1,38 @@
+name: Supabase Daily Backup
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Dump database
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          mkdir -p /tmp/dump
+          pg_dump "postgresql://postgres.bowsildqipdjnhwpnjay@aws-0-eu-central-1.pooler.supabase.com:5432/postgres" \
+            --no-owner --no-privileges \
+            -f "/tmp/dump/$(date -u +%Y-%m-%dT%H-%M-%SZ).sql"
+
+      - name: Commit dump to backups branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin backups:backups || git branch backups
+          git worktree add /tmp/backups-branch backups
+          mkdir -p /tmp/backups-branch/backups
+          cp /tmp/dump/*.sql /tmp/backups-branch/backups/
+          cd /tmp/backups-branch
+          find backups -name '*.sql' -mtime +30 -delete
+          git add backups
+          git commit -m "Backup $(date -u +%Y-%m-%d)"
+          git push origin backups
