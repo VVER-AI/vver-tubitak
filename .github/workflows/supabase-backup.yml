@@ -11,17 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install postgresql-client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
       - name: Dump database
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           mkdir -p /tmp/dump
-          pg_dump "postgresql://postgres.bowsildqipdjnhwpnjay@aws-0-eu-central-1.pooler.supabase.com:5432/postgres" \
+          docker run --rm \
+            -e PGPASSWORD \
+            -v /tmp/dump:/dump \
+            postgres:17 \
+            pg_dump "postgresql://postgres.bowsildqipdjnhwpnjay@aws-0-eu-central-1.pooler.supabase.com:5432/postgres" \
             --no-owner --no-privileges \
-            -f "/tmp/dump/$(date -u +%Y-%m-%dT%H-%M-%SZ).sql"
+            -f "/dump/$(date -u +%Y-%m-%dT%H-%M-%SZ).sql"
 
       - name: Commit dump to backups branch
         run: |
